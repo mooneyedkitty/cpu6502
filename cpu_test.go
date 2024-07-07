@@ -1,8 +1,16 @@
 package cpu6502
 
+import (
+	"fmt"
+	"testing"
+)
+
+//go:embed instruction_test.bin
+var instructionTest []byte
+
 // ----------------------------------------------------------------------------
-// cpu.go
-// Public API for the 6502 CPU Emulator
+// cpu_test.go
+// Tests the 6502 emulator
 // ----------------------------------------------------------------------------
 // Copyright (c) 2024 Robert L. Snyder <rob@mooneyedkitty.com>
 //
@@ -26,49 +34,30 @@ package cpu6502
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Interfaces
+// Memory with the Bus Implementation
 // ----------------------------------------------------------------------------
 
-type Bus interface {
-	Read(uint16) uint8
-	Write(uint16, uint8)
+type Memory struct {
+	data [0xFFFF]uint8
+}
+
+func (m *Memory) Read(addr uint16) uint8 {
+	return m.data[addr]
+}
+
+func (m *Memory) Write(addr uint16, data uint8) {
+	m.data[addr] = data
 }
 
 // ----------------------------------------------------------------------------
-// Structures
+// Instruction Set Test
 // ----------------------------------------------------------------------------
 
-type CPU struct {
-	accumulator      uint8
-	x                uint8
-	y                uint8
-	stack_pointer    uint8
-	processor_status uint8
-	program_counter  uint16
-	bus              Bus
-	remaining_cycles int
-	Logging          bool
-}
+func TestCPUInstructions(t *testing.T) {
 
-// ----------------------------------------------------------------------------
-// Initialization
-// ----------------------------------------------------------------------------
+	memory := Memory{}
+	copy(memory.data[:], instructionTest)
+	cpu := NewCPU(&memory)
+	fmt.Printf("cpu: %v\n", cpu)
 
-func NewCPU(bus Bus) *CPU {
-	cpu := CPU{
-		accumulator:      0,
-		x:                0,
-		y:                0,
-		stack_pointer:    0xFF,
-		processor_status: 0,
-		program_counter:  0,
-		bus:              bus,
-		remaining_cycles: 0,
-		Logging:          false,
-	}
-
-	startAddress := uint16(bus.Read(0x0ffc)) | uint16(bus.Read(0x0ffd))<<8
-	cpu.program_counter = startAddress
-
-	return &cpu
 }

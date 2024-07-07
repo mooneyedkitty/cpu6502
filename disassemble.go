@@ -35,7 +35,11 @@ import (
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Constants
+// Options
+// ----------------------------------------------------------------------------
+// The caller can specify zero or more dump ranges in a range file. These
+// ranges are used to tune the disassembly. If no ranges are provided, a single
+// range of type CODE that covers all addresses is created.
 // ----------------------------------------------------------------------------
 
 type disassembleRangeType int
@@ -45,30 +49,32 @@ const (
 	DATA
 	BYTE
 	WORD
-	STRING
 	SKIP
 )
 
+type disassembleRange struct {
+	startAddress uint16
+	endAddress   uint16
+	rangeType    disassembleRangeType
+}
+
 // ----------------------------------------------------------------------------
-// Type Definitions
+// Disassembly Options
 // ----------------------------------------------------------------------------
 
 type DisassembleOptions struct {
-	FileName      string
-	StartAddress  int
-	FileOffset    int
-	RangeFileName string
-}
-
-type disassembleRange struct {
-	startAddress int
-	endAddress   int
-	rangeType    disassembleRangeType
+	FileName      string // Binary file to dump
+	StartAddress  uint16 // Address to use as the base
+	FileOffset    uint16 // Location to start at in the file
+	RangeFileName string // Name of the optional range file
 }
 
 // ----------------------------------------------------------------------------
 // File Reading / Parsing
 // ----------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
+// Read in the binary file into a byte array
 
 func readFile(filename string) ([]byte, error) {
 	file, err := os.Open(filename)
@@ -79,6 +85,9 @@ func readFile(filename string) ([]byte, error) {
 
 	return io.ReadAll(file)
 }
+
+// ----------------------------------------------------------------------------
+// Parse the provided range file into a slice of entries
 
 func parseRangeFile(filename string) ([]disassembleRange, error) {
 	file, err := os.Open(filename)
@@ -93,20 +102,26 @@ func parseRangeFile(filename string) ([]disassembleRange, error) {
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
+
+		// We allow both comments and blank lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
+		// Assume this is a valid line; split it into fields.
 		fields := strings.Fields(line)
+
+		// Make sure we have three values and validate
 		if len(fields) != 3 {
-			return nil, fmt.Errorf("invalid line %d", lineNumber)
+			return nil, fmt.Errorf("invalid line %d - expected three values", lineNumber)
 		}
 		startAddress, err := strconv.ParseInt(strings.TrimPrefix(fields[0], "0x"), 16, 16)
 		if err != nil {
-			return nil, fmt.Errorf("invalid line %d", lineNumber)
+			return nil, fmt.Errorf("invalid start address on line %d", lineNumber)
 		}
 		endAddress, err := strconv.ParseInt(strings.TrimPrefix(fields[0], "0x"), 16, 16)
 		if err != nil {
-			return nil, fmt.Errorf("invalid line %d", lineNumber)
+			return nil, fmt.Errorf("invalid end address on line %d", lineNumber)
 		}
 
 		var code disassembleRangeType
@@ -119,17 +134,16 @@ func parseRangeFile(filename string) ([]disassembleRange, error) {
 			code = BYTE
 		case "WORD":
 			code = WORD
-		case "STRING":
-			code = STRING
 		case "SKIP":
 			code = SKIP
 		default:
-			return nil, fmt.Errorf("invalid line %d", lineNumber)
+			return nil, fmt.Errorf("invalid type code on line %d", lineNumber)
 		}
 
+		// Append this data as a new entry
 		ranges = append(ranges, disassembleRange{
-			startAddress: int(startAddress),
-			endAddress:   int(endAddress),
+			startAddress: uint16(startAddress),
+			endAddress:   uint16(endAddress),
 			rangeType:    code,
 		})
 
@@ -140,8 +154,117 @@ func parseRangeFile(filename string) ([]disassembleRange, error) {
 }
 
 // ----------------------------------------------------------------------------
-// Mainline Disassembly
+//  Disassembly
 // ----------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
+// Dumps the current. Returns the number of bytes dumped and the string
+// representation.
+
+func disassemble_line(ranges []disassembleRange, effective_address uint16,
+	data [3]uint8) (int, string) {
+
+	var line strings.Builder
+	fmt.Fprintf(&line, "%04X\t\t", effective_address)
+
+	var bytes_dumped int = 0
+
+	// scan all of the ranges and take appropriate action
+	for _, rangeEntry := range ranges {
+
+		// this range matches
+		if effective_address >= rangeEntry.startAddress &&
+			effective_address <= rangeEntry.endAddress {
+
+			switch rangeEntry.rangeType {
+			case CODE:
+				// We are dumping code
+				instruction := instructionTable[data[0]]
+
+				if instruction.instruction == UNDEFINED {
+					fmt.Fprintf(&line, "db\t$%02X", data[0])
+					bytes_dumped = 1
+				} else {
+					// Print out the bytes for this instruction
+					for i := range instruction.bytes {
+						fmt.Fprintf(&line, "%02X ", data[i])
+					}
+
+					// Move to mnemonic column
+					fmt.Fprint(&line, "\t")
+					// if less than three bytes, we need another tab to
+					// line things up
+					if instruction.bytes < 3 {
+						fmt.Fprint(&line, "\t")
+					}
+
+					// Print mnemonic column
+					fmt.Fprintf(&line, "%s\t", instruction.mnemonic)
+
+					// Print instruction data as appropriate
+					switch instruction.addressingMode {
+					case IMMEDIATE:
+						fmt.Fprintf(&line, "#$%02X", data[1])
+					case ABSOLUTE:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "$%04X", addr)
+					case ZEROPAGE:
+						fmt.Fprintf(&line, "$%02X", data[1])
+					case ABSOLUTE_X:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "$%04X,X", addr)
+					case ABSOLUTE_Y:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "$%04X,Y", addr)
+					case ZEROPAGE_X:
+						fmt.Fprintf(&line, "$%02X,X", data[1])
+					case ZEROPAGE_Y:
+						fmt.Fprintf(&line, "$%02X,Y", data[1])
+					case INDIRECT:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "($%04X)", addr)
+					case INDIRECT_X:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "($%04X,X)", addr)
+					case INDIRECT_Y:
+						addr := uint16(data[2])<<8 | uint16(data[1])
+						fmt.Fprintf(&line, "($%04X),Y", addr)
+					case RELATIVE:
+						rel := int8(data[1])
+						fmt.Fprintf(&line, "$%04X", int(effective_address)+int(rel)+instruction.bytes)
+					}
+
+					bytes_dumped = instruction.bytes
+				}
+			case DATA:
+				fmt.Fprintf(&line, "db\t")
+				for {
+					fmt.Fprintf(&line, "%02X ", data[0])
+					bytes_dumped++
+					if effective_address+uint16(bytes_dumped) > rangeEntry.endAddress {
+						break
+					}
+				}
+			case BYTE:
+				fmt.Fprintf(&line, "db\t%02X", data[0])
+				bytes_dumped = 1
+			case WORD:
+				value := uint16(data[0])<<8 | uint16(data[1])
+				fmt.Fprintf(&line, "dw\t%04X", value)
+				bytes_dumped = 2
+			case SKIP:
+				bytes_dumped = 1
+			}
+		}
+
+	}
+
+	return bytes_dumped, line.String()
+
+}
+
+// ----------------------------------------------------------------------------
+// Dissassembly from a Binary File
 
 func Disassemble(options *DisassembleOptions) {
 
@@ -149,15 +272,16 @@ func Disassemble(options *DisassembleOptions) {
 	if err != nil {
 		panic(err)
 	}
-
 	var ranges []disassembleRange = nil
 
 	if options.RangeFileName != "" {
+		// Attempt to read the Range File
 		ranges, err = parseRangeFile(options.RangeFileName)
 		if err != nil {
 			panic(err)
 		}
 	} else {
+		// We have no range file, so create a generic CODE range
 		ranges = make([]disassembleRange, 1)
 		ranges[0] = disassembleRange{
 			startAddress: 0,
@@ -166,99 +290,19 @@ func Disassemble(options *DisassembleOptions) {
 		}
 	}
 
-	address := 0
-	for offset := options.FileOffset; offset < len(data); {
-
-		fmt.Printf("%04X\t\t", address+options.StartAddress)
-
-		for _, rangeEntry := range ranges {
-
-			if address+options.StartAddress >= rangeEntry.startAddress &&
-				address+options.StartAddress <= rangeEntry.endAddress {
-
-				switch rangeEntry.rangeType {
-				case CODE:
-					instruction := instructionTable[data[offset]]
-					if instruction.instruction == UNDEFINED {
-						fmt.Printf("db\t$%02X", data[offset])
-						offset++
-						address++
-					} else {
-						for i := range instruction.bytes {
-							fmt.Printf("%02X ", data[offset+i])
-						}
-						fmt.Printf("\t")
-						if instruction.bytes < 3 {
-							fmt.Printf("\t")
-						}
-						fmt.Printf("%s\t", instruction.mnemonic)
-						switch instruction.addressingMode {
-						case IMMEDIATE:
-							fmt.Printf("#$%02X", data[offset+1])
-						case ABSOLUTE:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("$%04X", addr)
-						case ZEROPAGE:
-							fmt.Printf("$%02X", data[offset+1])
-						case ABSOLUTE_X:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("$%04X,X", addr)
-						case ABSOLUTE_Y:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("$%04X,Y", addr)
-						case ZEROPAGE_X:
-							fmt.Printf("$%02X,X", data[offset+1])
-						case ZEROPAGE_Y:
-							fmt.Printf("$%02X,Y", data[offset+1])
-						case INDIRECT:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("($%04X)", addr)
-						case INDIRECT_X:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("($%04X,X)", addr)
-						case INDIRECT_Y:
-							addr := uint16(data[offset+2])<<8 | uint16(data[offset+1])
-							fmt.Printf("($%04X),Y", addr)
-						case RELATIVE:
-							rel := int8(data[offset+1])
-							fmt.Printf("$%04X", address+int(rel)+instruction.bytes+options.StartAddress)
-						}
-
-						offset += instruction.bytes
-						address += instruction.bytes
-					}
-				case DATA:
-					fmt.Printf("db\t")
-					for {
-						fmt.Printf("%02X ", data[offset])
-						offset++
-						address++
-						if address+options.StartAddress > rangeEntry.endAddress {
-							break
-						}
-					}
-				case BYTE:
-					fmt.Printf("db\t%02X", data[offset])
-					offset++
-					address++
-				case WORD:
-					value := uint16(data[offset])<<8 | uint16(data[offset+1])
-					fmt.Printf("dw\t%04X", value)
-					offset += 2
-					address += 2
-				case STRING:
-					fmt.Printf("ds\t")
-					for value := data[offset]; value != 0; offset++ {
-						fmt.Printf("%c", value)
-						address++
-					}
-				case SKIP:
-				}
-			}
-
+	for offset := int(options.FileOffset); offset < len(data); {
+		var d [3]uint8
+		if offset+2 <= 0xFFFF {
+			d = [3]uint8{data[offset], data[offset+1], data[offset+2]}
+		} else if offset+1 <= 0xFFFF {
+			d = [3]uint8{data[offset], data[offset+1], data[0]}
+		} else {
+			d = [3]uint8{data[offset], data[0], data[1]}
 		}
-
-		fmt.Println()
+		bytes_dumped, line := disassemble_line(ranges,
+			uint16(options.StartAddress)-(uint16(offset)-options.FileOffset), d)
+		fmt.Println(line)
+		offset += bytes_dumped
 	}
 
 }

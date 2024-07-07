@@ -1,8 +1,10 @@
 package cpu6502
 
+import "fmt"
+
 // ----------------------------------------------------------------------------
-// cpu.go
-// Public API for the 6502 CPU Emulator
+// decode.go
+// Instruction execution mainline
 // ----------------------------------------------------------------------------
 // Copyright (c) 2024 Robert L. Snyder <rob@mooneyedkitty.com>
 //
@@ -26,49 +28,39 @@ package cpu6502
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Interfaces
+// Instruction Execution
 // ----------------------------------------------------------------------------
 
-type Bus interface {
-	Read(uint16) uint8
-	Write(uint16, uint8)
-}
+func (cpu *CPU) ExecuteCycle() error {
 
-// ----------------------------------------------------------------------------
-// Structures
-// ----------------------------------------------------------------------------
-
-type CPU struct {
-	accumulator      uint8
-	x                uint8
-	y                uint8
-	stack_pointer    uint8
-	processor_status uint8
-	program_counter  uint16
-	bus              Bus
-	remaining_cycles int
-	Logging          bool
-}
-
-// ----------------------------------------------------------------------------
-// Initialization
-// ----------------------------------------------------------------------------
-
-func NewCPU(bus Bus) *CPU {
-	cpu := CPU{
-		accumulator:      0,
-		x:                0,
-		y:                0,
-		stack_pointer:    0xFF,
-		processor_status: 0,
-		program_counter:  0,
-		bus:              bus,
-		remaining_cycles: 0,
-		Logging:          false,
+	if cpu.remaining_cycles > 0 {
+		cpu.remaining_cycles--
+		return nil
 	}
 
-	startAddress := uint16(bus.Read(0x0ffc)) | uint16(bus.Read(0x0ffd))<<8
-	cpu.program_counter = startAddress
+	opcode := cpu.bus.Read(cpu.program_counter)
+	instruction := instructionTable[opcode]
+	if instruction.instruction == UNDEFINED {
+		return fmt.Errorf("invalid opcode: %02X", opcode)
+	}
 
-	return &cpu
+	ranges := make([]disassembleRange, 1)
+	ranges[0] = disassembleRange{
+		startAddress: 0,
+		endAddress:   0xffff,
+		rangeType:    CODE,
+	}
+
+	instruction_data := [3]uint8{
+		cpu.bus.Read(cpu.program_counter),
+		cpu.bus.Read(cpu.program_counter + 1),
+		cpu.bus.Read(cpu.program_counter + 2),
+	}
+
+	if cpu.Logging {
+		disassemble_line(ranges, cpu.program_counter, instruction_data)
+	}
+
+	return nil
+
 }
