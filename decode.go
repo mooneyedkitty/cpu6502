@@ -31,17 +31,21 @@ import "fmt"
 // Call table
 // ----------------------------------------------------------------------------
 
-type InstructionHandler func(InstructionTableEntry)
+type InstructionHandler func(*InstructionTableEntry)
 
 func build_call_table(cpu *CPU) map[Instruction]InstructionHandler {
 
 	t := make(map[Instruction]InstructionHandler)
+
 	t[LDA] = cpu.lda
 	t[LDX] = cpu.ldx
 	t[LDY] = cpu.ldy
 	t[STA] = cpu.sta
 	t[STX] = cpu.stx
 	t[STY] = cpu.sty
+
+	t[ADC] = cpu.adc
+	t[SBC] = cpu.sbc
 
 	return t
 }
@@ -67,7 +71,11 @@ func (cpu *CPU) ExecuteCycle() error {
 
 	// Execute the instruction and set remaining cycles
 
-	cpu.handlers[instruction.instruction](instruction)
+	handler, found := cpu.handlers[instruction.instruction]
+	if !found {
+		return fmt.Errorf("unsupported instruction: %s", instruction.mnemonic)
+	}
+	handler(&instruction)
 	cpu.remaining_cycles = instruction.cycles - 1
 
 	return nil

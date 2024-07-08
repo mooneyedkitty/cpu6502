@@ -1,8 +1,9 @@
 package cpu6502
 
 // ----------------------------------------------------------------------------
-// flags.go
-// Flag (processor status) operation
+// inst_arithmetic.go
+// Arithmetic Instructions
+// ADC, SBC
 // ----------------------------------------------------------------------------
 // Copyright (c) 2024 Robert L. Snyder <rob@mooneyedkitty.com>
 //
@@ -25,47 +26,27 @@ package cpu6502
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------
-// Flag Setting
+func (c *CPU) adc(i *InstructionTableEntry) {
 
-func (c *CPU) set_negative(data uint8) {
-	if data>>7 == 1 {
-		c.processor_status = c.processor_status | 0b10000000
-	} else {
-		c.processor_status = c.processor_status & 0b01111111
-	}
+	operand := c.load_by_addressing_mode(i.addressingMode)
+	carry := c.get_carry()
+	trial := uint(operand) + uint(c.accumulator) + uint(carry)
+	c.accumulator = c.accumulator + operand + carry
+	c.set_carry(trial > 0xFFFF)
+	c.set_overflow(int8(c.accumulator) > 127 || int8(c.accumulator) < -128)
+	c.set_negative(c.accumulator)
+	c.set_zero(c.accumulator)
+
 }
 
-func (c *CPU) set_zero(data uint8) {
-	if data == 0 {
-		c.processor_status = c.processor_status | 0b00000010
-	} else {
-		c.processor_status = c.processor_status & 0b11111101
-	}
-}
+func (c *CPU) sbc(i *InstructionTableEntry) {
 
-func (c *CPU) set_carry(on bool) {
-	if on {
-		c.processor_status = c.processor_status | 0b00000001
-	} else {
-		c.processor_status = c.processor_status & 0b11111110
-	}
-}
-
-func (c *CPU) set_overflow(on bool) {
-	if on {
-		c.processor_status = c.processor_status | 0b01000000
-	} else {
-		c.processor_status = c.processor_status & 0b01000000
-	}
-}
-
-// ----------------------------------------------------------------------------
-// Flag Getting
-
-func (c *CPU) get_carry() uint8 {
-	if c.processor_status&0b00000001 > 0 {
-		return 1
-	}
-	return 0
+	operand := c.load_by_addressing_mode(i.addressingMode)
+	carry := c.get_carry()
+	trial := int(c.accumulator) - int(operand) - int(carry)
+	c.accumulator = c.accumulator - operand - carry
+	c.set_carry(trial < 0)
+	c.set_overflow(int8(c.accumulator) > 127 || int8(c.accumulator) < -128)
+	c.set_negative(c.accumulator)
+	c.set_zero(c.accumulator)
 }

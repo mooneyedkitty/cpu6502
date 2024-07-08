@@ -26,38 +26,38 @@ package cpu6502
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-func (c *CPU) lda(i InstructionTableEntry) {
+func (c *CPU) lda(i *InstructionTableEntry) {
 	c.accumulator = c.load_by_addressing_mode(i.addressingMode)
 	c.set_negative(c.accumulator)
 	c.set_zero(c.accumulator)
 	c.program_counter += uint16(i.bytes)
 }
 
-func (c *CPU) ldx(i InstructionTableEntry) {
+func (c *CPU) ldx(i *InstructionTableEntry) {
 	c.x = c.load_by_addressing_mode(i.addressingMode)
 	c.set_negative(c.x)
 	c.set_zero(c.x)
 	c.program_counter += uint16(i.bytes)
 }
 
-func (c *CPU) ldy(i InstructionTableEntry) {
+func (c *CPU) ldy(i *InstructionTableEntry) {
 	c.y = c.load_by_addressing_mode(i.addressingMode)
 	c.set_negative(c.y)
 	c.set_zero(c.y)
 	c.program_counter += uint16(i.bytes)
 }
 
-func (c *CPU) sta(i InstructionTableEntry) {
+func (c *CPU) sta(i *InstructionTableEntry) {
 	c.store_by_addressing_mode(i.addressingMode, c.accumulator)
 	c.program_counter += uint16(i.bytes)
 }
 
-func (c *CPU) stx(i InstructionTableEntry) {
+func (c *CPU) stx(i *InstructionTableEntry) {
 	c.store_by_addressing_mode(i.addressingMode, c.x)
 	c.program_counter += uint16(i.bytes)
 }
 
-func (c *CPU) sty(i InstructionTableEntry) {
+func (c *CPU) sty(i *InstructionTableEntry) {
 	c.store_by_addressing_mode(i.addressingMode, c.y)
 	c.program_counter += uint16(i.bytes)
 }
