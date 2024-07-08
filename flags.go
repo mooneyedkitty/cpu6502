@@ -1,10 +1,8 @@
 package cpu6502
 
-import "fmt"
-
 // ----------------------------------------------------------------------------
-// decode.go
-// Instruction execution mainline
+// flags.go
+// Flag (processor status) operation
 // ----------------------------------------------------------------------------
 // Copyright (c) 2024 Robert L. Snyder <rob@mooneyedkitty.com>
 //
@@ -28,48 +26,20 @@ import "fmt"
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Call table
-// ----------------------------------------------------------------------------
+// Flag Setting
 
-type InstructionHandler func(InstructionTableEntry)
-
-func build_call_table(cpu *CPU) map[Instruction]InstructionHandler {
-
-	t := make(map[Instruction]InstructionHandler)
-	t[LDA] = cpu.lda
-	t[LDX] = cpu.ldx
-	t[LDY] = cpu.ldy
-	t[STA] = cpu.sta
-	t[STX] = cpu.stx
-	t[STY] = cpu.sty
-
-	return t
+func (c *CPU) set_negative(data uint8) {
+	if data>>7 == 1 {
+		c.processor_status = c.processor_status | 0b10000000
+	} else {
+		c.processor_status = c.processor_status & 0b01111111
+	}
 }
 
-// ----------------------------------------------------------------------------
-// Instruction Execution
-// ----------------------------------------------------------------------------
-
-func (cpu *CPU) ExecuteCycle() error {
-
-	// Burn off any remaining cycles from the last instruction
-	if cpu.remaining_cycles > 0 {
-		cpu.remaining_cycles--
-		return nil
+func (c *CPU) set_zero(data uint8) {
+	if data == 0 {
+		c.processor_status = c.processor_status | 0b00000010
+	} else {
+		c.processor_status = c.processor_status & 0b11111101
 	}
-
-	// Read the opcode and load the instruction
-	opcode := cpu.bus.Read(cpu.program_counter)
-	instruction := instructionTable[opcode]
-	if instruction.instruction == UNDEFINED {
-		return fmt.Errorf("invalid opcode: %02X", opcode)
-	}
-
-	// Execute the instruction and set remaining cycles
-
-	cpu.handlers[instruction.instruction](instruction)
-	cpu.remaining_cycles = instruction.cycles - 1
-
-	return nil
-
 }

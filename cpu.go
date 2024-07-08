@@ -47,7 +47,7 @@ type CPU struct {
 	program_counter  uint16
 	bus              Bus
 	remaining_cycles int
-	Logging          bool
+	handlers         map[Instruction]InstructionHandler
 }
 
 // ----------------------------------------------------------------------------
@@ -64,9 +64,9 @@ func NewCPU(bus Bus) *CPU {
 		program_counter:  0,
 		bus:              bus,
 		remaining_cycles: 0,
-		Logging:          false,
 	}
 
+	cpu.handlers = build_call_table(&cpu)
 	startAddress := uint16(bus.Read(0x0ffc)) | uint16(bus.Read(0x0ffd))<<8
 	cpu.program_counter = startAddress
 

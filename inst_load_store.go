@@ -1,10 +1,9 @@
 package cpu6502
 
-import "fmt"
-
 // ----------------------------------------------------------------------------
-// decode.go
-// Instruction execution mainline
+// inst_load_store.go
+// Load and Store Instructions
+// LDA, LDX, LDY, STA, STX, STY
 // ----------------------------------------------------------------------------
 // Copyright (c) 2024 Robert L. Snyder <rob@mooneyedkitty.com>
 //
@@ -27,49 +26,38 @@ import "fmt"
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------
-// Call table
-// ----------------------------------------------------------------------------
-
-type InstructionHandler func(InstructionTableEntry)
-
-func build_call_table(cpu *CPU) map[Instruction]InstructionHandler {
-
-	t := make(map[Instruction]InstructionHandler)
-	t[LDA] = cpu.lda
-	t[LDX] = cpu.ldx
-	t[LDY] = cpu.ldy
-	t[STA] = cpu.sta
-	t[STX] = cpu.stx
-	t[STY] = cpu.sty
-
-	return t
+func (c *CPU) lda(i InstructionTableEntry) {
+	c.accumulator = c.load_by_addressing_mode(i.addressingMode)
+	c.set_negative(c.accumulator)
+	c.set_zero(c.accumulator)
+	c.program_counter += uint16(i.bytes)
 }
 
-// ----------------------------------------------------------------------------
-// Instruction Execution
-// ----------------------------------------------------------------------------
+func (c *CPU) ldx(i InstructionTableEntry) {
+	c.x = c.load_by_addressing_mode(i.addressingMode)
+	c.set_negative(c.x)
+	c.set_zero(c.x)
+	c.program_counter += uint16(i.bytes)
+}
 
-func (cpu *CPU) ExecuteCycle() error {
+func (c *CPU) ldy(i InstructionTableEntry) {
+	c.y = c.load_by_addressing_mode(i.addressingMode)
+	c.set_negative(c.y)
+	c.set_zero(c.y)
+	c.program_counter += uint16(i.bytes)
+}
 
-	// Burn off any remaining cycles from the last instruction
-	if cpu.remaining_cycles > 0 {
-		cpu.remaining_cycles--
-		return nil
-	}
+func (c *CPU) sta(i InstructionTableEntry) {
+	c.store_by_addressing_mode(i.addressingMode, c.accumulator)
+	c.program_counter += uint16(i.bytes)
+}
 
-	// Read the opcode and load the instruction
-	opcode := cpu.bus.Read(cpu.program_counter)
-	instruction := instructionTable[opcode]
-	if instruction.instruction == UNDEFINED {
-		return fmt.Errorf("invalid opcode: %02X", opcode)
-	}
+func (c *CPU) stx(i InstructionTableEntry) {
+	c.store_by_addressing_mode(i.addressingMode, c.x)
+	c.program_counter += uint16(i.bytes)
+}
 
-	// Execute the instruction and set remaining cycles
-
-	cpu.handlers[instruction.instruction](instruction)
-	cpu.remaining_cycles = instruction.cycles - 1
-
-	return nil
-
+func (c *CPU) sty(i InstructionTableEntry) {
+	c.store_by_addressing_mode(i.addressingMode, c.y)
+	c.program_counter += uint16(i.bytes)
 }
