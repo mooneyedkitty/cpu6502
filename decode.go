@@ -47,6 +47,13 @@ func build_call_table(cpu *CPU) map[Instruction]InstructionHandler {
 	t[ADC] = cpu.adc
 	t[SBC] = cpu.sbc
 
+	t[INC] = cpu.inc
+	t[INX] = cpu.inx
+	t[INY] = cpu.iny
+	t[DEC] = cpu.dec
+	t[DEX] = cpu.dex
+	t[DEY] = cpu.dey
+
 	return t
 }
 

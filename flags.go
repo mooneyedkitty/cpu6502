@@ -26,37 +26,57 @@ package cpu6502
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
+// masks
+
+const (
+	FLAG_NEGATIVE = 0b10000000
+	FLAG_OVERFLOW = 0b01000000
+	FLAG_BRK      = 0b00010000
+	FLAG_DECIMAL  = 0b00001000
+	FLAG_IRQ      = 0b00000100
+	FLAG_ZERO     = 0b00000010
+	FLAG_CARRY    = 0b00000001
+	MASK_NEGATIVE = 0b01111111
+	MASK_OVERFLOW = 0b10111111
+	MASK_BRK      = 0b11101111
+	MASK_DECIMAL  = 0b11110111
+	MASK_IRQ      = 0b11111011
+	MASK_ZERO     = 0b11111101
+	MASK_CARRY    = 0b11111110
+)
+
+// ----------------------------------------------------------------------------
 // Flag Setting
 
 func (c *CPU) set_negative(data uint8) {
 	if data>>7 == 1 {
-		c.processor_status = c.processor_status | 0b10000000
+		c.processor_status = c.processor_status | FLAG_NEGATIVE
 	} else {
-		c.processor_status = c.processor_status & 0b01111111
+		c.processor_status = c.processor_status & MASK_NEGATIVE
 	}
 }
 
 func (c *CPU) set_zero(data uint8) {
 	if data == 0 {
-		c.processor_status = c.processor_status | 0b00000010
+		c.processor_status = c.processor_status | FLAG_ZERO
 	} else {
-		c.processor_status = c.processor_status & 0b11111101
+		c.processor_status = c.processor_status & MASK_ZERO
 	}
 }
 
 func (c *CPU) set_carry(on bool) {
 	if on {
-		c.processor_status = c.processor_status | 0b00000001
+		c.processor_status = c.processor_status | FLAG_CARRY
 	} else {
-		c.processor_status = c.processor_status & 0b11111110
+		c.processor_status = c.processor_status & MASK_CARRY
 	}
 }
 
 func (c *CPU) set_overflow(on bool) {
 	if on {
-		c.processor_status = c.processor_status | 0b01000000
+		c.processor_status = c.processor_status | FLAG_OVERFLOW
 	} else {
-		c.processor_status = c.processor_status & 0b01000000
+		c.processor_status = c.processor_status & MASK_OVERFLOW
 	}
 }
 
@@ -64,7 +84,7 @@ func (c *CPU) set_overflow(on bool) {
 // Flag Getting
 
 func (c *CPU) get_carry() uint8 {
-	if c.processor_status&0b00000001 > 0 {
+	if c.processor_status&FLAG_CARRY > 0 {
 		return 1
 	}
 	return 0
