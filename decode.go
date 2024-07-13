@@ -54,6 +54,25 @@ func build_call_table(cpu *CPU) map[Instruction]InstructionHandler {
 	t[DEX] = cpu.dex
 	t[DEY] = cpu.dey
 
+	t[AND] = cpu.and
+	t[ORA] = cpu.ora
+	t[EOR] = cpu.eor
+
+	// JMP, BCC, BCS, BEQ, BNE, BMI, BPL, BVS, BVC, CMP, CPX, CPY, BIT
+	t[JMP] = cpu.jmp
+	t[BCC] = cpu.bcc
+	t[BCS] = cpu.bcs
+	t[BEQ] = cpu.beq
+	t[BNE] = cpu.bne
+	t[BMI] = cpu.bmi
+	t[BPL] = cpu.bpl
+	t[BVS] = cpu.bvs
+	t[BVC] = cpu.bvc
+	t[CMP] = cpu.cmp
+	t[CPX] = cpu.cpx
+	t[CPY] = cpu.cpy
+	t[BIT] = cpu.bit
+
 	return t
 }
 

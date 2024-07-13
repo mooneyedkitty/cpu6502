@@ -27,6 +27,12 @@ import "fmt"
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
+func (c *CPU) read_and_adjust_relative() {
+	pc_as_int := int(c.program_counter)
+	adjustment := int(c.read_immediate())
+	c.program_counter = uint16(pc_as_int + adjustment)
+}
+
 // ----------------------------------------------------------------------------
 // Immediate
 
@@ -45,6 +51,11 @@ func (c *CPU) read_absolute() uint8 {
 func (c *CPU) write_absolute(data uint8) {
 	addr := uint16(c.bus.Read(c.program_counter+2))<<8 | uint16(c.bus.Read(c.program_counter+1))
 	c.bus.Write(addr, data)
+}
+
+func (c *CPU) read_absolute_16() uint16 {
+	addr := uint16(c.bus.Read(c.program_counter+2))<<8 | uint16(c.bus.Read(c.program_counter+1))
+	return uint16(c.bus.Read(addr)) | (uint16(c.bus.Read(addr+1)) << 8)
 }
 
 // ----------------------------------------------------------------------------

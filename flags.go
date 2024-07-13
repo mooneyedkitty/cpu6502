@@ -80,6 +80,14 @@ func (c *CPU) set_overflow(on bool) {
 	}
 }
 
+func (c *CPU) set(flag uint8, on bool) {
+	if on {
+		c.processor_status = c.processor_status | flag
+	} else {
+		c.processor_status = c.processor_status & ^flag
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Flag Getting
 
@@ -88,4 +96,8 @@ func (c *CPU) get_carry() uint8 {
 		return 1
 	}
 	return 0
+}
+
+func (c *CPU) is_set(flag uint8) bool {
+	return c.processor_status&flag > 0
 }

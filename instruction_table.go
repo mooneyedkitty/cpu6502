@@ -61,7 +61,7 @@ const (
 	BIT
 	BMI
 	BNE
-	BFL
+	BPL
 	BRK
 	BVC
 	BVS
@@ -119,7 +119,7 @@ var mnemonic_map = map[string]Instruction{
 	"BIT": BIT,
 	"BMI": BMI,
 	"BNE": BNE,
-	"BFL": BFL,
+	"BPL": BPL,
 	"BRK": BRK,
 	"BVC": BVC,
 	"BVS": BVS,
